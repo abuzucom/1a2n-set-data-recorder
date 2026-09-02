@@ -1,12 +1,16 @@
 package api
 
 import (
+	"context"
+	"crypto/subtle"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/abuzucom/1a2n-set-data-recorder/internal/events"
 	"github.com/abuzucom/1a2n-set-data-recorder/internal/model"
+	"github.com/abuzucom/1a2n-set-data-recorder/internal/paths"
 	"github.com/abuzucom/1a2n-set-data-recorder/internal/session"
 	"github.com/abuzucom/1a2n-set-data-recorder/internal/ws"
 	"github.com/gin-gonic/gin"
@@ -15,19 +19,30 @@ import (
 )
 
 type Dependencies struct {
-	Sessions    *session.Manager
-	Hub         *ws.Hub
-	Logger      *events.Logger
-	LogsRoot    string
-	Decks       interface{ Decks() []model.DeckState }
-	Devices     interface{ Devices() []model.DeviceState }
-	DeckUpdates <-chan model.DeckState
+	Context        context.Context
+	AuthToken      string
+	Sessions       *session.Manager
+	Hub            *ws.Hub
+	Logger         *events.Logger
+	LogsRoot       string
+	RecordingsRoot string
+	Decks          interface{ Decks() []model.DeckState }
+	Devices        interface{ Devices() []model.DeviceState }
+	DeckUpdates    <-chan model.DeckState
 }
 
 const maxRequestBodyBytes = 64 * 1024
 
 func Setup(deps Dependencies) *gin.Engine {
+	recordingsRoot := deps.RecordingsRoot
+	if recordingsRoot == "" {
+		recordingsRoot = deps.LogsRoot
+	}
 	gin.EnableJsonDecoderDisallowUnknownFields()
+	workerContext := deps.Context
+	if workerContext == nil {
+		workerContext = context.Background()
+	}
 	var logMu sync.Mutex
 	logger := deps.Logger
 	persistEvent := func(event model.Event) error {
@@ -50,6 +65,7 @@ func Setup(deps Dependencies) *gin.Engine {
 		c.Header("Content-Security-Policy", "default-src 'self'; connect-src 'self' ws: wss:; style-src 'self'; script-src 'self'")
 		c.Next()
 	})
+	r.Use(requireMutationAuthorization(deps.AuthToken))
 	r.Use(func(c *gin.Context) {
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxRequestBodyBytes)
 		c.Next()
@@ -84,7 +100,13 @@ func Setup(deps Dependencies) *gin.Engine {
 	})
 	if deps.DeckUpdates != nil {
 		go func() {
-			for deck := range deps.DeckUpdates {
+			for {
+				var deck model.DeckState
+				select {
+				case <-workerContext.Done():
+					return
+				case deck = <-deps.DeckUpdates:
+				}
 				deps.Hub.Broadcast(deck)
 				events, err := deps.Sessions.UpdateDeck(deck)
 				if err != nil {
@@ -265,8 +287,8 @@ func Setup(deps Dependencies) *gin.Engine {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 			return
 		}
-		path := filepath.Clean(body.AudioPath)
-		if filepath.IsAbs(path) || path == "." || strings.HasPrefix(path, "..") {
+		resolvedPath, err := paths.ResolveUnderRoot(recordingsRoot, body.AudioPath)
+		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "audioFilePath must be relative"})
 			return
 		}
@@ -291,7 +313,12 @@ func Setup(deps Dependencies) *gin.Engine {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "recordingStopTimestamp precedes recordingStartTimestamp"})
 			return
 		}
-		event.AudioPath = filepath.ToSlash(path)
+		relativePath, err := filepath.Rel(recordingsRoot, resolvedPath)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to normalize audioFilePath"})
+			return
+		}
+		event.AudioPath = filepath.ToSlash(relativePath)
 		event.OffsetSeconds = body.OffsetSeconds
 		logMu.Lock()
 		if logger != nil {
@@ -309,6 +336,31 @@ func Setup(deps Dependencies) *gin.Engine {
 	r.StaticFile("/style.css", "ui/dist/style.css")
 	r.StaticFile("/app.js", "ui/dist/app.js")
 	return r
+}
+
+func requireMutationAuthorization(token string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.Method != http.MethodPost || token == "" {
+			c.Next()
+			return
+		}
+		origin := c.GetHeader("Origin")
+		if origin != "" && !matchesOriginHost(origin, c.Request.Host) {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "origin is not allowed"})
+			return
+		}
+		provided := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
+		if subtle.ConstantTimeCompare([]byte(provided), []byte(token)) != 1 {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authorization is required"})
+			return
+		}
+		c.Next()
+	}
+}
+
+func matchesOriginHost(origin, host string) bool {
+	parsed, err := url.ParseRequestURI(origin)
+	return err == nil && parsed.Host == host
 }
 
 func normalizeName(value string) (string, bool) {

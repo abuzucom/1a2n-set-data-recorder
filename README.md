@@ -4,13 +4,18 @@ Set data recorder interfacing with CDJ via local network
 
 ## Running
 
-Install Go 1.27.0. Run `go run ./cmd/cdj-session-agent`.
+Install Go 1.27.0. Set `CDJ_SESSION_API_TOKEN` to an opaque secret. Run
+`go run ./cmd/cdj-session-agent`.
 
 The service listens on `127.0.0.1:8080` by default. Set `--listen-address`
 explicitly before exposing the service on a network. Session JSONL logs write
 under `data/logs`. Set `--data-dir` to select a different local root.
 
 The static interface loads at `http://127.0.0.1:8080`.
+
+Enter the same token in the dashboard before using session controls. Every
+mutation endpoint requires `Authorization: Bearer <token>`. Browser requests
+with an `Origin` header must use the server origin.
 
 Pass `--enable-pro-dj-link` only on the CDJ network. The Pro DJ Link library
 announces a virtual player. Do not run it with a player number already in use.
