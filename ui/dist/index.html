@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CDJ Session</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="masthead">
+    <p class="eyebrow">Set data recorder</p>
+    <h1>CDJ Session</h1>
+    <p class="connection" id="connection">Connecting</p>
+  </header>
+  <main>
+    <section class="session-panel" aria-labelledby="session-heading">
+      <div>
+        <p class="eyebrow">Current session</p>
+        <h2 id="session-heading">No session active</h2>
+      </div>
+      <div class="token-field">
+        <label for="api-token">Access token</label>
+        <input id="api-token" type="password" autocomplete="off" placeholder="CDJ_SESSION_API_TOKEN">
+      </div>
+      <form id="session">
+        <label for="session-name">Session name</label>
+        <div class="form-row">
+          <input id="session-name" name="name" maxlength="100" required placeholder="Friday night">
+          <button type="submit">Start</button>
+          <button type="button" id="end-session">End</button>
+        </div>
+      </form>
+    </section>
+    <section class="decks" aria-label="Deck status" id="decks"></section>
+    <section class="devices-panel" aria-labelledby="devices-heading">
+      <p class="eyebrow">Network devices</p>
+      <h2 id="devices-heading">Pro DJ Link registry</h2>
+      <ul id="devices"></ul>
+    </section>
+    <section class="controls" aria-label="Session controls">
+      <form id="handoff">
+        <p class="eyebrow">DJ handoff</p>
+        <label for="next-dj">Next DJ</label>
+        <div class="form-row"><input id="next-dj" name="next" maxlength="100" required placeholder="DJ name"><button type="submit">Log handoff</button></div>
+      </form>
+      <div class="recording-controls">
+        <p class="eyebrow">External recording</p>
+        <button type="button" data-recording="start">Recording started</button>
+        <button type="button" data-recording="stop">Recording stopped</button>
+      </div>
+      <form id="recording-metadata">
+        <p class="eyebrow">Recording metadata</p>
+        <label for="audio-path">Audio path</label>
+        <div class="form-row"><input id="audio-path" name="audioPath" required placeholder="set.wav"></div>
+        <label for="recording-start">Audio start time</label>
+        <input id="recording-start" name="recordingStart" type="datetime-local">
+        <label for="recording-stop">Audio stop time</label>
+        <input id="recording-stop" name="recordingStop" type="datetime-local">
+        <label for="recording-offset">Alignment offset seconds</label>
+        <div class="form-row"><input id="recording-offset" name="offsetSeconds" type="number" step="0.001" value="0"><button type="submit">Save metadata</button></div>
+      </form>
+    </section>
+    <section class="data-panel" aria-labelledby="status-heading">
+      <p class="eyebrow">Live status</p>
+      <h2 id="status-heading">Session data</h2>
+      <pre id="status">Loading</pre>
+    </section>
+    <section class="timeline-panel" aria-labelledby="timeline-heading">
+      <p class="eyebrow">Session timeline</p>
+      <h2 id="timeline-heading">Event history</h2>
+      <ol id="timeline"></ol>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
