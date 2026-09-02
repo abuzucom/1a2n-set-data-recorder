@@ -27,6 +27,9 @@ go.work.sum
 # env file
 .env
 
+# Local Chromaprint executable
+fpcalc/
+
 # Python checker cache
 __pycache__/
 
