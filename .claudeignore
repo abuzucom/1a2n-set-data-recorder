@@ -1,0 +1,12 @@
+.git/
+.env*
+!.env.example
+
+# Ignore duplicate rule copies for other tools
+.cursorrules
+.clinerules
+.windsurfrules
+.copilot-instructions
+.github/copilot-instructions.md
+GEMINI.md
+CONVENTIONS.md
