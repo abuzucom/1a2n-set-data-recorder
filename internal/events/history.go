@@ -12,6 +12,11 @@ import (
 	"github.com/abuzucom/1a2n-set-data-recorder/internal/model"
 )
 
+const (
+	maxListedSessions   = 100
+	maxSessionTailBytes = 64 * 1024
+)
+
 func ListSessions(root string) ([]model.Session, error) {
 	entries, err := os.ReadDir(root)
 	if errors.Is(err, os.ErrNotExist) {
@@ -22,18 +27,23 @@ func ListSessions(root string) ([]model.Session, error) {
 	}
 	sessions := make([]model.Session, 0, len(entries))
 	for _, entry := range entries {
+		if len(sessions) == maxListedSessions {
+			break
+		}
 		if entry.IsDir() || !strings.HasPrefix(entry.Name(), "session-") || !strings.HasSuffix(entry.Name(), ".jsonl") || strings.HasSuffix(entry.Name(), ".identifications.jsonl") {
 			continue
 		}
-		events, err := ReadEvents(root, strings.TrimSuffix(strings.TrimPrefix(entry.Name(), "session-"), ".jsonl"))
-		if err != nil || len(events) == 0 {
+		event, err := readFirstEvent(filepath.Join(root, entry.Name()))
+		if err != nil {
 			continue
 		}
-		session := model.Session{ID: events[0].SessionID, Name: events[0].SessionName, StartedAt: events[0].Timestamp}
-		for _, event := range events {
-			if event.EventType == model.EventSessionEnd {
-				session.EndedAt = event.Timestamp
-			}
+		if event.EventType != model.EventSessionStart {
+			continue
+		}
+		session := model.Session{ID: event.SessionID, Name: event.SessionName, StartedAt: event.Timestamp}
+		lastEvent, err := readLastEvent(filepath.Join(root, entry.Name()))
+		if err == nil && lastEvent.EventType == model.EventSessionEnd {
+			session.EndedAt = lastEvent.Timestamp
 		}
 		sessions = append(sessions, session)
 	}
@@ -41,6 +51,63 @@ func ListSessions(root string) ([]model.Session, error) {
 		return sessions[i].StartedAt.After(sessions[j].StartedAt)
 	})
 	return sessions, nil
+}
+
+func readLastEvent(path string) (model.Event, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return model.Event{}, err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return model.Event{}, err
+	}
+	start := info.Size() - maxSessionTailBytes
+	if start < 0 {
+		start = 0
+	}
+	if _, err := file.Seek(start, 0); err != nil {
+		return model.Event{}, err
+	}
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 4096), 1024*1024)
+	var lastEvent model.Event
+	for scanner.Scan() {
+		var event model.Event
+		if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+			if start != 0 {
+				continue
+			}
+			return model.Event{}, err
+		}
+		lastEvent = event
+	}
+	if err := scanner.Err(); err != nil {
+		return model.Event{}, err
+	}
+	if lastEvent.EventID == "" {
+		return model.Event{}, errors.New("session log has no events")
+	}
+	return lastEvent, nil
+}
+
+func readFirstEvent(path string) (model.Event, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return model.Event{}, err
+	}
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 4096), 1024*1024)
+	if !scanner.Scan() {
+		return model.Event{}, scanner.Err()
+	}
+	var event model.Event
+	if err := json.Unmarshal(scanner.Bytes(), &event); err != nil {
+		return model.Event{}, err
+	}
+	return event, nil
 }
 
 func ReadEvents(root, sessionID string) ([]model.Event, error) {

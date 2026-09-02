@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -17,6 +18,8 @@ import (
 	"github.com/abuzucom/1a2n-set-data-recorder/internal/events"
 	"github.com/abuzucom/1a2n-set-data-recorder/internal/model"
 )
+
+const maxAcoustIDResponseBytes = 1024 * 1024
 
 type fingerprint struct {
 	Duration    int    `json:"duration"`
@@ -129,7 +132,7 @@ func identify(audioPath, fpcalcPath string, position, duration float64) (json.Ra
 		return nil, fmt.Errorf("AcoustID returned %s", response.Status)
 	}
 	var result json.RawMessage
-	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(io.LimitReader(response.Body, maxAcoustIDResponseBytes)).Decode(&result); err != nil {
 		return nil, err
 	}
 	return result, nil

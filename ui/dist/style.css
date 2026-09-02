@@ -27,6 +27,7 @@ main { padding-top: 24px; padding-bottom: 48px; }
 .session-panel, .data-panel, .timeline-panel, .devices-panel { background: var(--charcoal); border: 1px solid var(--silver); padding: 24px; }
 .controls { display: grid; gap: 24px; grid-template-columns: 2fr 1fr; margin-bottom: 24px; }.controls > * { background: var(--charcoal); border: 1px solid var(--silver); padding: 24px; }.recording-controls button { margin: 8px 8px 0 0; }.controls #recording-metadata { grid-column: 1 / -1; }
 .session-panel { display: flex; gap: 24px; justify-content: space-between; align-items: end; }
+.token-field { min-width: min(100%, 280px); }
 form { min-width: min(100%, 340px); } label { display: block; margin-bottom: 8px; }
 .form-row { display: flex; } input, button { border: 1px solid var(--silver); border-radius: 0; font: inherit; padding: 12px; }
 input { background: var(--pitch); color: var(--paper); flex: 1; min-width: 0; } #recording-metadata input { margin-bottom: 12px; width: 100%; } button { background: var(--paper); color: var(--pitch); cursor: pointer; font-weight: 500; }
