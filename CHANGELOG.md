@@ -12,3 +12,4 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Added the `abuzucom/agents` policy and enforcement integration.
 - Added the Go CDJ session server foundation and static user interface.
 - Added session JSONL history, Pro DJ Link device state, and recording metadata.
+- Added DJ-focused setup, workflow, storage, safety, and integration guidance.
